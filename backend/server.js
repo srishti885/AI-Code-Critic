@@ -11,6 +11,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const JWT_SECRET = 'SUPER_SECRET_KEY';
+
 // 1. Database Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/codecritic';
 mongoose.connect(MONGO_URI)
@@ -21,6 +23,9 @@ mongoose.connect(MONGO_URI)
 const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+    role: { type: String, default: 'user' }, 
+    subscription: { type: String, default: 'free' }, 
+    usageCount: { type: Number, default: 0 },       
     history: [{
         codeSnippet: String,
         review: String,
@@ -30,6 +35,23 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+// Middleware: Admin Check
+const isAdmin = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "No token provided" });
+    const token = authHeader.split(" ")[1];
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        if (user && user.role === 'admin') {
+            req.user = user;
+            next();
+        } else {
+            res.status(403).json({ error: "Access denied. Admins only." });
+        }
+    } catch (err) { res.status(401).json({ error: "Invalid session" }); }
+};
+
 const hf = new HfInference(process.env.HF_TOKEN);
 
 // 3. Auth Endpoints
@@ -37,12 +59,12 @@ app.post('/api/auth/signup', async (req, res) => {
     try {
         const { email, password } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ email, password: hashedPassword });
+        const userCount = await User.countDocuments();
+        const role = userCount === 0 ? 'admin' : 'user';
+        const newUser = new User({ email, password: hashedPassword, role });
         await newUser.save();
         res.status(201).json({ message: "Registration successful" });
-    } catch (err) {
-        res.status(400).json({ error: "User already exists" });
-    }
+    } catch (err) { res.status(400).json({ error: "User already exists" }); }
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -52,61 +74,100 @@ app.post('/api/auth/login', async (req, res) => {
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
-        const token = jwt.sign({ userId: user._id }, 'SUPER_SECRET_KEY', { expiresIn: '7d' });
-        res.json({ token, email: user.email });
-    } catch (err) {
-        res.status(500).json({ error: "Authentication failed" });
+        const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ 
+            token, 
+            userId: user._id, // Added userId for easier frontend updates
+            email: user.email, 
+            role: user.role, 
+            subscription: user.subscription,
+            usageCount: user.usageCount 
+        });
+    } catch (err) { res.status(500).json({ error: "Authentication failed" }); }
+});
+
+// 4. ADMIN CONTROL ENDPOINTS
+app.get('/api/admin/stats', isAdmin, async (req, res) => {
+    try {
+        const users = await User.find({}).select('-password'); 
+        const totalAudits = users.reduce((acc, user) => acc + (user.history ? user.history.length : 0), 0);
+        res.json({ totalUsers: users.length, totalAudits, users });
+    } catch (err) { res.status(500).json({ error: "Failed to fetch stats" }); }
+});
+
+// --- FEATURE UPDATE: Generic Update API for Roles/Subscription ---
+app.patch('/api/admin/users/:id/role', async (req, res) => {
+    try {
+        await User.findByIdAndUpdate(req.params.id, req.body); 
+        res.json({ message: "Status updated successfully" });
+    } catch (err) { 
+        res.status(500).json({ error: "Update failed" }); 
     }
 });
 
-// 4. Core Logic
+app.delete('/api/admin/users/:id', isAdmin, async (req, res) => {
+    try {
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ message: "User deleted" });
+    } catch (err) { res.status(500).json({ error: "Delete failed" }); }
+});
+
+// 5. Core Logic
 app.post('/api/review', async (req, res) => {
     const { code, token } = req.body;
+    if (!token) return res.status(401).json({ error: "Please login to review code." });
+
     try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+
+        // --- FEATURE UPDATE: Check Premium status along with role ---
+        if (user.role !== 'admin' && user.subscription !== 'premium' && user.usageCount >= 3) {
+            return res.status(403).json({ 
+                error: "Free review limit reached! Please upgrade to Premium.",
+                limitReached: true
+            });
+        }
+
         const response = await hf.chatCompletion({
-            model: "Qwen/Qwen2.5-7B-Instruct",
+            model: "Qwen/Qwen2.5-Coder-32B-Instruct", 
             messages: [
                 {
                     role: "system",
-                    content: "Review code for performance and security. Format: Suggestions first, then FULL CORRECTED CODE between ### FIXED_CODE_BLOCK and ### END_BLOCK."
+                    content: `You are a Senior Principal Software Engineer. Audit code for security (OWASP Top 10), logic, and performance. Format: [Review] ### FIXED_CODE_BLOCK [Code] ### END_BLOCK`
                 },
-                { role: "user", content: code }
+                { role: "user", content: `Review and refactor this code:\n${code}` }
             ],
-            max_tokens: 1200,
+            max_tokens: 2000, 
+            temperature: 0.1, 
         });
 
         const fullText = response.choices[0].message.content;
         const fixedCodeMatch = fullText.match(/### FIXED_CODE_BLOCK([\s\S]*?)### END_BLOCK/);
-        const fixedCode = fixedCodeMatch ? fixedCodeMatch[1].replace(/```javascript|```/g, "").trim() : "";
-        const review = fullText.replace(/### FIXED_CODE_BLOCK[\s\S]*?### END_BLOCK/, "").trim();
-        const score = Math.floor(Math.random() * (98 - 70 + 1)) + 70;
+        let fixedCode = fixedCodeMatch ? fixedCodeMatch[1].trim() : "";
+        fixedCode = fixedCode.replace(/```[a-z]*\n|```/g, "").trim();
+        const review = fullText.split("### FIXED_CODE_BLOCK")[0].trim();
+        const score = Math.floor(Math.random() * (98 - 75 + 1)) + 75;
 
-        if (token) {
-            try {
-                const decoded = jwt.verify(token, 'SUPER_SECRET_KEY');
-                await User.findByIdAndUpdate(decoded.userId, {
-                    $push: { history: { codeSnippet: code, review, score } }
-                });
-            } catch (e) { console.log("Invalid token, history not saved"); }
-        }
+        await User.findByIdAndUpdate(decoded.userId, {
+            $inc: { usageCount: 1 },
+            $push: { history: { codeSnippet: code, review, score } }
+        });
 
-        res.json({ review, fixedCode, score });
+        res.json({ review, fixedCode, score, usageCount: user.usageCount + 1 });
     } catch (error) {
-        res.status(500).json({ error: "AI processing failed" });
+        res.status(500).json({ error: "AI Engine busy." });
     }
 });
 
 app.get('/api/history', async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Access denied" });
-
     try {
-        const decoded = jwt.verify(token, 'SUPER_SECRET_KEY');
+        const decoded = jwt.verify(token, JWT_SECRET);
         const user = await User.findById(decoded.userId).select('history');
         res.json(user.history.reverse());
-    } catch (err) {
-        res.status(401).json({ error: "Session expired" });
-    }
+    } catch (err) { res.status(401).json({ error: "Session expired" }); }
 });
 
 const PORT = 5000;
