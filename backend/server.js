@@ -11,7 +11,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const JWT_SECRET = 'SUPER_SECRET_KEY';
+// JWT_SECRET ko env se lena better hai, fallback ke liye aapki key rakhi hai
+const JWT_SECRET = process.env.JWT_SECRET || 'SUPER_SECRET_KEY';
 
 // 1. Database Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/codecritic';
@@ -54,6 +55,11 @@ const isAdmin = async (req, res, next) => {
 
 const hf = new HfInference(process.env.HF_TOKEN);
 
+// --- NEW: Base Route (Taaki "Cannot GET /" na aaye) ---
+app.get('/', (req, res) => {
+    res.status(200).json({ message: "Visionary AI Backend is Live!" });
+});
+
 // 3. Auth Endpoints
 app.post('/api/auth/signup', async (req, res) => {
     try {
@@ -77,7 +83,7 @@ app.post('/api/auth/login', async (req, res) => {
         const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ 
             token, 
-            userId: user._id, // Added userId for easier frontend updates
+            userId: user._id,
             email: user.email, 
             role: user.role, 
             subscription: user.subscription,
@@ -95,8 +101,8 @@ app.get('/api/admin/stats', isAdmin, async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Failed to fetch stats" }); }
 });
 
-// --- FEATURE UPDATE: Generic Update API for Roles/Subscription ---
-app.patch('/api/admin/users/:id/role', async (req, res) => {
+// --- FIX: Added isAdmin middleware for security ---
+app.patch('/api/admin/users/:id/role', isAdmin, async (req, res) => {
     try {
         await User.findByIdAndUpdate(req.params.id, req.body); 
         res.json({ message: "Status updated successfully" });
@@ -121,7 +127,6 @@ app.post('/api/review', async (req, res) => {
         const decoded = jwt.verify(token, JWT_SECRET);
         const user = await User.findById(decoded.userId);
 
-        // --- FEATURE UPDATE: Check Premium status along with role ---
         if (user.role !== 'admin' && user.subscription !== 'premium' && user.usageCount >= 3) {
             return res.status(403).json({ 
                 error: "Free review limit reached! Please upgrade to Premium.",
@@ -170,5 +175,6 @@ app.get('/api/history', async (req, res) => {
     } catch (err) { res.status(401).json({ error: "Session expired" }); }
 });
 
-const PORT = 5000;
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+// --- FIX: PORT ko dynamic kiya Render ke liye ---
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server is running on port ${PORT}`));

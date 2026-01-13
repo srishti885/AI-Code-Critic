@@ -1,75 +1,35 @@
-# AI Code Critic - Professional Static Analysis Tool
+# AI Code Critic Pro
 
-AI Code Critic is a full-stack web application designed to help developers review, optimize, and secure their source code using Artificial Intelligence.
+A professional-grade code review application that leverages Artificial Intelligence to analyze, optimize, and secure source code. This tool provides real-time feedback, quality scores, and automated bug fixes for developers.
 
-## Features
+## Key Features
 
-- **AI-Powered Code Review**: Analyzes logic, performance, and security vulnerabilities.
-- **Automated Refactoring**: Generates optimized code snippets that can be applied instantly.
-- **Health Scoring**: Provides a numerical percentage score based on code quality.
-- **User Authentication**: Secure Login and Signup system using JWT and Bcrypt.
-- **Analysis History**: Stores previous reviews in MongoDB for future reference.
-- **PDF Export**: Allows users to download a professional report of the AI audit.
+* **AI-Powered Analysis:** Deep scanning of code logic to identify potential bugs and performance bottlenecks.
+* **Automated Refactoring:** Provides a corrected version of the code that can be applied with a single click.
+* **Health Scoring:** Generates a percentage-based quality score for every code audit.
+* **Export Reports:** Option to download the full audit report as a PDF for documentation.
+* **Admin Dashboard:** Comprehensive system administration for user management and usage statistics.
+* **History Tracking:** Maintains a record of previous code sessions for future reference.
 
-## Tech Stack
+## Technology Stack
 
-- **Frontend**: React.js, Lucide Icons, Axios, Canvas-Confetti.
-- **Backend**: Node.js, Express.js.
-- **Database**: MongoDB Atlas (Cloud).
-- **AI Engine**: Hugging Face Inference API (Qwen 2.5 Model).
-- **Security**: JSON Web Tokens (JWT) and Password Hashing.
+* **Frontend:** React.js, Lucide-React (Icons), React-Markdown.
+* **Styling:** Modern CSS-in-JS with a responsive Sidebar-Main layout.
+* **Backend:** Node.js, Express.js (Connected via Axios).
+* **Utilities:** html2pdf.js for report generation and canvas-confetti for UI interactions.
 
-## Installation and Setup
+## Installation and Usage
 
-1. **Clone the repository**
-   ```bash
-   git clone [https://github.com/srishti885/AI-Code-Critic.git](https://github.com/srishti885/AI-Code-Critic.git)
-   cd AI-Code-Critic
+1. Clone the repository:
+   git clone https://github.com/srishti885/AI-Code-Critic.git
 
+2. Install dependencies:
+   npm install
 
-2. **Setup Backend**
-* Navigate to the backend folder.
-* Install dependencies: `npm install`.
-* Create a `.env` file and add:
-```env
-MONGO_URI=your_mongodb_connection_string
-HF_TOKEN=your_hugging_face_token
-JWT_SECRET=your_secret_key
-PORT=5000
+3. Start the application:
+   npm start
 
+## Developer Credit
 
-
-* Start the server: `node server.js`.
-
-
-3. **Setup Frontend**
-* Navigate to the frontend folder.
-* Install dependencies: `npm install`.
-* Start the development server: `npm run dev`.
-
-
-
-## Environment Variables
-
-To run this project, you will need to add the following environment variables to your .env file:
-
-* `HF_TOKEN`: API Key from Hugging Face.
-* `MONGO_URI`: Connection string for MongoDB Atlas.
-* `JWT_SECRET`: A secure string for authentication.
-
-## License
-
-This project is developed for educational purposes as part of a professional portfolio.
-
-
-
-
-### **Ab kya karna hai?**
-
-1. Is file ko save kijiye.
-2. Terminal mein ye commands chalaiye taaki ye GitHub par update ho jaye:
-   ```bash
-   git add README.md
-   git commit -m "Added professional documentation"
-   git push origin main
-
+DESIGNED AND DEVELOPED BY SRISHTI
+Copyright © 2025 CodeCritic Pro. All rights reserved.
