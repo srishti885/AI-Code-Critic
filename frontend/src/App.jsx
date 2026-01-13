@@ -43,7 +43,7 @@ function App() {
     e.preventDefault();
     const endpoint = isLogin ? "/api/auth/login" : "/api/auth/signup";
     try {
-      const res = await axios.post(`http://localhost:5000${endpoint}`, authData);
+      const res = await axios.post(`https://ai-code-critic-e3ct.onrender.com${endpoint}`, authData);
       if (isLogin) {
         localStorage.setItem("user", JSON.stringify(res.data));
         setUser(res.data);
@@ -86,7 +86,7 @@ function App() {
 
   const fetchAdminStats = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/admin/stats", {
+      const res = await axios.get("https://ai-code-critic-e3ct.onrender.com/api/admin/stats", {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       setAdminStats(res.data);
@@ -99,7 +99,7 @@ function App() {
   const handleDeleteUser = async (userId) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
-      await axios.delete(`http://localhost:5000/api/admin/users/${userId}`, {
+      await axios.delete(`https://ai-code-critic-e3ct.onrender.com/api/admin/users/${userId}`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       fetchAdminStats();
@@ -111,7 +111,7 @@ function App() {
   const handleToggleRole = async (userId, currentRole) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     try {
-      await axios.patch(`http://localhost:5000/api/admin/users/${userId}/role`, 
+      await axios.patch(`https://ai-code-critic-e3ct.onrender.com/api/admin/users/${userId}/role`, 
         { role: newRole },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
@@ -132,7 +132,7 @@ function App() {
 
     setLoading(true); setReview(""); setFixedCode(""); setScore(null);
     try {
-      const res = await axios.post("http://localhost:5000/api/review", { code, token: user.token });
+      const res = await axios.post("https://ai-code-critic-e3ct.onrender.com/api/review", { code, token: user.token });
       setReview(res.data.review);
       setFixedCode(res.data.fixedCode);
       setScore(res.data.score);
@@ -152,7 +152,7 @@ function App() {
   const fetchHistory = async () => {
     if (!user) return setShowAuth(true);
     try {
-      const res = await axios.get("http://localhost:5000/api/history", {
+      const res = await axios.get("https://ai-code-critic-e3ct.onrender.com/api/history", {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       setHistory(res.data);
